@@ -1,0 +1,48 @@
+name: Bump formula
+
+# Checks PyPI daily for a new anyvm.py release. When one is found, the
+# formula is updated, installed and tested on a macOS runner, and the
+# bump is pushed only if the install + test pass.
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Update formula from PyPI
+        id: bump
+        run: |
+          python3 .github/scripts/bump.py
+          if git diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git diff
+          fi
+
+      - name: Install and test the updated formula
+        if: steps.bump.outputs.changed == 'true'
+        run: |
+          brew install --formula ./Formula/anyvm.rb
+          brew test ./Formula/anyvm.rb
+          anyvm --help
+          anyvm.py --help
+
+      - name: Commit and push
+        if: steps.bump.outputs.changed == 'true'
+        run: |
+          version="$(sed -n 's/.*anyvm_py-\([0-9][^"]*\)\.tar\.gz.*/\1/p' Formula/anyvm.rb | head -1)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/anyvm.rb
+          git commit -m "anyvm ${version}"
+          git push

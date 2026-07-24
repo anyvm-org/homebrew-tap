@@ -1,0 +1,33 @@
+name: Test formula
+
+# Note: pushes made by bump.yml with the default GITHUB_TOKEN do not
+# trigger this workflow (GitHub suppresses recursive workflow runs);
+# bump.yml runs its own install + test before pushing instead. This
+# workflow covers user pushes, PRs, and manual runs.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Formula/**"
+      - ".github/workflows/test.yml"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install from the local checkout
+        run: brew install --formula ./Formula/anyvm.rb
+
+      - name: Test
+        run: |
+          brew test ./Formula/anyvm.rb
+          anyvm --help
+          anyvm.py --help
