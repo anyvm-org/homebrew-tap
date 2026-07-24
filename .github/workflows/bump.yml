@@ -29,11 +29,18 @@ jobs:
             git diff
           fi
 
+      # Homebrew refuses to install a formula from a bare file path
+      # ("Homebrew requires formulae to be in a tap"), so register the
+      # checkout itself as the anyvm-org/tap tap and install by name --
+      # this picks up the just-updated formula, not the GitHub main copy.
       - name: Install and test the updated formula
         if: steps.bump.outputs.changed == 'true'
         run: |
-          brew install --formula ./Formula/anyvm.rb
-          brew test ./Formula/anyvm.rb
+          tapdir="$(brew --repository)/Library/Taps/anyvm-org/homebrew-tap"
+          mkdir -p "$(dirname "$tapdir")"
+          ln -sfn "$GITHUB_WORKSPACE" "$tapdir"
+          brew install anyvm-org/tap/anyvm
+          brew test anyvm-org/tap/anyvm
           anyvm --help
           anyvm.py --help
 

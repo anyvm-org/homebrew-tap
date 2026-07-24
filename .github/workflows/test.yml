@@ -23,11 +23,20 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Homebrew refuses to install a formula from a bare file path
+      # ("Homebrew requires formulae to be in a tap"), so register the
+      # checkout itself as the anyvm-org/tap tap and install by name.
+      - name: Register the checkout as the anyvm-org/tap tap
+        run: |
+          tapdir="$(brew --repository)/Library/Taps/anyvm-org/homebrew-tap"
+          mkdir -p "$(dirname "$tapdir")"
+          ln -sfn "$GITHUB_WORKSPACE" "$tapdir"
+
       - name: Install from the local checkout
-        run: brew install --formula ./Formula/anyvm.rb
+        run: brew install anyvm-org/tap/anyvm
 
       - name: Test
         run: |
-          brew test ./Formula/anyvm.rb
+          brew test anyvm-org/tap/anyvm
           anyvm --help
           anyvm.py --help
