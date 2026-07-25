@@ -9,12 +9,15 @@ on:
     - cron: "17 3 * * *"
   workflow_dispatch:
 
-permissions:
-  contents: write
+permissions: {} # default to none
 
 jobs:
   bump:
     runs-on: macos-latest
+    permissions:
+      - contents: read  # read-only until tested
+    outputs:
+      - changed: ${{ steps.bump.outputs.changed || 'false' }}
     steps:
       - uses: actions/checkout@v7
 
@@ -29,12 +32,26 @@ jobs:
             git diff
           fi
 
+  release-bump:
+    needs: [bump]
+    if: ${{ needs.bump.outputs.changed == 'true' }}
+    runs-on: macos-latest
+    permissions:
+      - contents: write  # full write access
+    steps:
+      # these two steps should actually just download an artifact of the
+      # expected changed files (e.g., filtered against injection)
+      - uses: actions/checkout@v7
+      - name: Prepare for Install
+        id: rebump
+        run: |
+          python3 .github/scripts/bump.py
+
       # Homebrew refuses to install a formula from a bare file path
       # ("Homebrew requires formulae to be in a tap"), so register the
       # checkout itself as the anyvm-org/tap tap and install by name --
       # this picks up the just-updated formula, not the GitHub main copy.
       - name: Install and test the updated formula
-        if: steps.bump.outputs.changed == 'true'
         run: |
           tapdir="$(brew --repository)/Library/Taps/anyvm-org/homebrew-tap"
           mkdir -p "$(dirname "$tapdir")"
@@ -45,7 +62,6 @@ jobs:
           anyvm.py --help
 
       - name: Commit and push
-        if: steps.bump.outputs.changed == 'true'
         run: |
           version="$(sed -n 's/.*anyvm_py-\([0-9][^"]*\)\.tar\.gz.*/\1/p' Formula/anyvm.rb | head -1)"
           git config user.name "github-actions[bot]"
