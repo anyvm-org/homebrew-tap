@@ -1,28 +1,40 @@
 name: Bump formula
 
 # Checks PyPI daily for a new anyvm.py release. When one is found, the
-# formula is updated, installed and tested on a macOS runner, and the
-# bump is pushed only if the install + test pass.
+# formula is updated and then installed + tested on a macOS runner; only
+# if that passes does a second job commit the bump.
+#
+# The two jobs exist for least privilege. "brew install"/"brew test"
+# executes the freshly downloaded upstream code, so it runs in a job
+# whose token cannot write to this repo. The pushing job re-derives the
+# same two-line edit by running bump.py again -- bump.py only reads the
+# PyPI JSON metadata and rewrites url + sha256, it never executes the
+# package -- so no artifact has to cross the privilege boundary.
 
 on:
   schedule:
     - cron: "17 3 * * *"
   workflow_dispatch:
 
-permissions:
-  contents: write
+permissions: {}
 
 jobs:
   bump:
     runs-on: macos-latest
+    permissions:
+      contents: read
+    outputs:
+      changed: ${{ steps.bump.outputs.changed }}
+      version: ${{ steps.bump.outputs.version }}
     steps:
       - uses: actions/checkout@v7
 
-      - name: Ignore other brew taps
-        id: per_bump
-        run: |
-          # Best effort warning suppression about aws/tap
-          brew untap aws/tap >/dev/null 2>&1 || true ;  # unused and untrusted
+      # The runner image ships aws/tap pre-tapped. Homebrew's tap-trust
+      # check then annotates every brew command with an "untrusted taps"
+      # warning that has nothing to do with this formula. We use no aws
+      # formula, so drop the tap (brew's own suggested fix).
+      - name: Drop the pre-tapped aws/tap to silence its trust warning
+        run: brew untap aws/tap || true
 
       - name: Update formula from PyPI
         id: bump
@@ -34,6 +46,8 @@ jobs:
             echo "changed=true" >> "$GITHUB_OUTPUT"
             git diff
           fi
+          version="$(sed -n 's/.*anyvm_py-\([0-9][^"]*\)\.tar\.gz.*/\1/p' Formula/anyvm.rb | head -1)"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
 
       # Homebrew refuses to install a formula from a bare file path
       # ("Homebrew requires formulae to be in a tap"), so register the
@@ -50,10 +64,33 @@ jobs:
           anyvm --help
           anyvm.py --help
 
-      - name: Commit and push
-        if: steps.bump.outputs.changed == 'true'
+  push:
+    needs: bump
+    if: needs.bump.outputs.changed == 'true'
+    # No brew here, so the cheaper Linux runner is enough.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Commit and push the tested bump
+        # The version crosses the job boundary through the environment,
+        # never through the shell command line.
+        env:
+          TESTED_VERSION: ${{ needs.bump.outputs.version }}
         run: |
+          python3 .github/scripts/bump.py
           version="$(sed -n 's/.*anyvm_py-\([0-9][^"]*\)\.tar\.gz.*/\1/p' Formula/anyvm.rb | head -1)"
+          if [ "${version}" != "${TESTED_VERSION}" ]; then
+            echo "PyPI moved from ${TESTED_VERSION} to ${version} between jobs;"
+            echo "refusing to push an untested formula. The next run picks it up."
+            exit 1
+          fi
+          if git diff --quiet; then
+            echo "formula already current; nothing to push"
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add Formula/anyvm.rb
