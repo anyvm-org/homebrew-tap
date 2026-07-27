@@ -18,6 +18,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Ignore other brew taps
+        id: per_bump
+        run: |
+          # Best effort warning suppression about aws/tap
+          brew untap aws/tap >/dev/null 2>&1 || true ;  # unused and untrusted
+
       - name: Update formula from PyPI
         id: bump
         run: |
