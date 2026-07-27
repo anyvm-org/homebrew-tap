@@ -23,6 +23,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # The runner image ships aws/tap pre-tapped. Homebrew's tap-trust
+      # check then annotates every brew command with an "untrusted taps"
+      # warning that has nothing to do with this formula. We do not use
+      # any aws formula, so drop the tap (brew's own suggested fix).
+      - name: Drop the pre-tapped aws/tap to silence its trust warning
+        run: brew untap aws/tap || true
+
       # Homebrew refuses to install a formula from a bare file path
       # ("Homebrew requires formulae to be in a tap"), so register the
       # checkout itself as the anyvm-org/tap tap and install by name.
