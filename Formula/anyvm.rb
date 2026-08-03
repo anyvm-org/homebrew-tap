@@ -3,8 +3,8 @@ class Anyvm < Formula
 
   desc "Run any VM anywhere: BSD, Illumos, and Linux guests with QEMU"
   homepage "https://github.com/anyvm-org/anyvm"
-  url "https://files.pythonhosted.org/packages/57/d0/13107e9fe6934ed93ad3553fcc9af7520dfc57f90f7ae7d5d7accd4e8d96/anyvm_py-0.5.4.tar.gz"
-  sha256 "7047b18adb610ea75bf90d402749c6c0c0be12c8d98de5f1e4ec998b7c982b7a"
+  url "https://files.pythonhosted.org/packages/9f/c4/0ccbb0be9be6a5c1a94444b47c8936238a24169e5796c5a0d9b7ebd13e77/anyvm_py-0.5.5.tar.gz"
+  sha256 "ff3cfc1f113e0139f726b57de76c7977519419a2c56a514022176378b544d323"
   license "MIT"
 
   depends_on "python@3.14"
