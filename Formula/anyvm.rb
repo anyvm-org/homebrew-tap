@@ -17,6 +17,10 @@ class Anyvm < Formula
     # needed at install time.
     rewrite_shebang detected_python_shebang, "anyvm.py"
     libexec.install "anyvm.py"
+    # The sdist ships anyvm.py mode 0644. Homebrew's cleaner only chmods
+    # shebang scripts to 0555 under bin/sbin/lib, never under libexec, so
+    # the wrapper below would exec a non-executable file (EACCES).
+    chmod 0755, libexec/"anyvm.py"
 
     # ANYVM_INSTALLED tells anyvm this copy came from a packager, so it keeps
     # its multi-GB images in the per-user cache instead of beside itself in
